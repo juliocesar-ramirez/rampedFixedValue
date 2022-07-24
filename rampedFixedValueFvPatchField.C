@@ -23,11 +23,14 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#include "dimensionSet.H"
 #include "rampedFixedValueFvPatchField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvPatchFieldMapper.H"
+#include "scalar.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "zero.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -37,28 +40,21 @@ Foam::scalar Foam::rampedFixedValueFvPatchField<Type>::t() const
     return this->db().time().timeOutputValue();
 }
 
+template<class Type>
+Foam::scalar Foam::rampedFixedValueFvPatchField<Type>::coeficienteX() const
+{
+    scalar y= (t()-tiempoInicial_)/(tiempoFinal_-tiempoInicial_);
+    return min(1,max(0,y));
+
+}
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-template<class Type>
-Foam::rampedFixedValueFvPatchField<Type>::
-rampedFixedValueFvPatchField
-(
-    const fvPatch& p,
-    const DimensionedField<Type, volMesh>& iF
-)
-:
-    fixedValueFvPatchField<Type>(p, iF),
-    scalarData_(0.0),
-    data_(Zero),
-    fieldData_(p.size(), Zero),
-    timeVsData_(),
-    wordData_("wordDefault"),
-    labelData_(-1),
-    boolData_(false)
-{
-}
-
+template <class Type>
+Foam::rampedFixedValueFvPatchField<Type>::rampedFixedValueFvPatchField(
+    const fvPatch &p, const DimensionedField<Type, volMesh> &iF)
+    : fixedValueFvPatchField<Type>(p, iF), scalarData_(0.0), tiempoFinal_(0.0),
+      tiempoInicial_(0.0), data_(Zero), valorAlto_(Zero),valorBajo_(Zero), fieldData_(p.size(), Zero) {}
 
 template<class Type>
 Foam::rampedFixedValueFvPatchField<Type>::
@@ -71,12 +67,12 @@ rampedFixedValueFvPatchField
 :
     fixedValueFvPatchField<Type>(p, iF),
     scalarData_(dict.lookup<scalar>("scalarData")),
+    tiempoFinal_(dict.lookup<scalar>("tiempoFinal")),
+    tiempoInicial_(dict.lookup<scalar>("tiempoInicial")),
     data_(dict.lookup<Type>("data")),
-    fieldData_("fieldData", dict, p.size()),
-    timeVsData_(Function1<Type>::New("timeVsData", dict)),
-    wordData_(dict.lookupOrDefault<word>("wordName", "wordDefault")),
-    labelData_(-1),
-    boolData_(false)
+    valorAlto_(dict.lookup<Type>("valorAlto")),
+    valorBajo_(dict.lookup<Type>("valorBajo")),
+    fieldData_("fieldData", dict, p.size())
 {
 
 
@@ -104,46 +100,32 @@ rampedFixedValueFvPatchField
 :
     fixedValueFvPatchField<Type>(ptf, p, iF, mapper),
     scalarData_(ptf.scalarData_),
+    tiempoInicial_(ptf.tiempoInicial_),
+    tiempoFinal_(ptf.tiempoFinal_),
     data_(ptf.data_),
-    fieldData_(mapper(ptf.fieldData_)),
-    timeVsData_(ptf.timeVsData_, false),
-    wordData_(ptf.wordData_),
-    labelData_(-1),
-    boolData_(ptf.boolData_)
+    valorAlto_(ptf.valorAlto_),
+    valorBajo_(ptf.valorBajo_),
+    fieldData_(mapper(ptf.fieldData_))
 {}
 
+template <class Type>
+Foam::rampedFixedValueFvPatchField<Type>::rampedFixedValueFvPatchField(
+    const rampedFixedValueFvPatchField<Type> &ptf,
+    const DimensionedField<Type, volMesh> &iF)
+    : fixedValueFvPatchField<Type>(ptf, iF), scalarData_(ptf.scalarData_),
+      tiempoInicial_(ptf.tiempoInicial_),tiempoFinal_(ptf.tiempoFinal_),
+      data_(ptf.data_),valorAlto_(ptf.valorAlto_),valorBajo_(ptf.valorBajo_),
+      fieldData_(ptf.fieldData_) {}
 
-template<class Type>
-Foam::rampedFixedValueFvPatchField<Type>::
-rampedFixedValueFvPatchField
-(
-    const rampedFixedValueFvPatchField<Type>& ptf,
-    const DimensionedField<Type, volMesh>& iF
-)
-:
-    fixedValueFvPatchField<Type>(ptf, iF),
-    scalarData_(ptf.scalarData_),
-    data_(ptf.data_),
-    fieldData_(ptf.fieldData_),
-    timeVsData_(ptf.timeVsData_, false),
-    wordData_(ptf.wordData_),
-    labelData_(-1),
-    boolData_(ptf.boolData_)
-{}
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * *
+// * //
 
-
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-template<class Type>
-void Foam::rampedFixedValueFvPatchField<Type>::autoMap
-(
-    const fvPatchFieldMapper& m
-)
-{
-    fixedValueFvPatchField<Type>::autoMap(m);
-    m(fieldData_, fieldData_);
+template <class Type>
+void Foam::rampedFixedValueFvPatchField<Type>::autoMap(
+    const fvPatchFieldMapper &m) {
+  fixedValueFvPatchField<Type>::autoMap(m);
+  m(fieldData_, fieldData_);
 }
-
 
 template<class Type>
 void Foam::rampedFixedValueFvPatchField<Type>::rmap
@@ -171,9 +153,8 @@ void Foam::rampedFixedValueFvPatchField<Type>::updateCoeffs()
 
     fixedValueFvPatchField<Type>::operator==
     (
-        data_
-      + fieldData_
-      + scalarData_*timeVsData_->value(t())
+        valorBajo_
+        +(valorAlto_-valorBajo_)*coeficienteX()
     );
 
 
@@ -189,10 +170,12 @@ void Foam::rampedFixedValueFvPatchField<Type>::write
 {
     fvPatchField<Type>::write(os);
     writeEntry(os, "scalarData", scalarData_);
+    writeEntry(os, "tiempoInicial", tiempoInicial_);
+    writeEntry(os, "tiempoFinal", tiempoFinal_);
     writeEntry(os, "data", data_);
+    writeEntry(os, "valorAlto", valorAlto_);
+    writeEntry(os, "valorBajo", valorBajo_);
     writeEntry(os, "fieldData", fieldData_);
-    writeEntry(os, timeVsData_());
-    writeEntry(os, "wordData", wordData_);
     writeEntry(os, "value", *this);
 }
 

@@ -1,4 +1,5 @@
 * Ramped Fixed Value
+Condición de borde para un valor scalar y vectorial, que varía de un valor inicial a un valor final de forma lineal en un periodo determinado de tiempo.
 * Referencias
 Tommaso Luchinni 2009. 4th OpenFOAM Workshop Montreal, Canada. OpenFOAM programming tutorial
-- file:///home/julio/Downloads/programmingTutorial.pdf
+- https://courses.physics.ucsd.edu/2009/Spring/physics142/Labs/Lab8/Tutorial2.pdf

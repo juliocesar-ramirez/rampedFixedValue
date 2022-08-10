@@ -1,0 +1,4 @@
+* Ramped Fixed Value
+* Referencias
+Tommaso Luchinni 2009. 4th OpenFOAM Workshop Montreal, Canada. OpenFOAM programming tutorial
+- file:///home/julio/Downloads/programmingTutorial.pdf
